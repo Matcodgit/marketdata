@@ -1,0 +1,57 @@
+from datetime import datetime, timedelta
+import pandas as pd
+from massive import RESTClient
+
+API_KEY = "YOUR_MASSIVE_API_KEY_HERE"
+
+INDEX_SYMBOLS = {
+    "S&P 500": "SPY",
+    "Nasdaq 100": "QQQ",
+    "Dow Jones": "DIA",
+    "Russell 2000": "IWM",
+    "Volatility": "VXX",
+}
+
+client = RESTClient(API_KEY)
+
+end_date = datetime.utcnow().date()
+start_date = end_date - timedelta(days=10)
+
+rows = []
+
+for index_name, symbol in INDEX_SYMBOLS.items():
+    try:
+        bars = list(client.list_aggs(
+            symbol,
+            1,
+            "day",
+            start_date.isoformat(),
+            end_date.isoformat(),
+            adjusted=True,
+            sort="desc",
+            limit=10,
+        ))
+
+        if not bars:
+            print(f"{symbol}: no daily data")
+            continue
+
+        latest = bars[0]
+
+        rows.append({
+            "index_name": index_name,
+            "symbol": symbol,
+            "date": pd.to_datetime(latest.timestamp, unit="ms", utc=True).date(),
+            "open": latest.open,
+            "high": latest.high,
+            "low": latest.low,
+            "close": latest.close,
+            "volume": latest.volume,
+        })
+
+    except Exception as exc:
+        print(f"{symbol} failed: {exc}")
+
+df = pd.DataFrame(rows)
+print(df)
+df.to_csv("index_daily_fallback.csv", index=False)
